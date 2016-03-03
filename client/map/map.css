@@ -1,22 +1,189 @@
 html, body {
-  height: 100%;
-  margin: 0;
+  height : 100%;
+  margin : 0;
   padding: 0;
 }
 
 #map {
   height: 100%;
+  width : 100%;
+  right : 0;
+  top   : 0;
 }
 
-.ruleBox{
+.tooltip-text{
+  font-size:15px;
+  width:100px;
+}
+
+.tooltip-text .rule-box{
+  border-bottom: 1px solid;
+}
+
+.tooltip-text .permit-code{
+  color:#f00;
+}
+
+.tooltip-text .parking-advice{
+  color:#4CAF50;
+  font-weight:bold;
+}
+
+.tooltip-text .cost {
+  display: inline-block;
+  float: right;
+}
+
+
+.searchBar{
+  /*position: absolute;
+  top: 100px;
+  left: 300px;*/
+}
+
+.searchBar {
+  /*background-color: rgba(0, 0, 0, 0.7);*/
+  /*background-color: blue;*/
   position: absolute;
-  top: 0;
-  right: 0;
-  background-color: #FFF;
-  padding: 20px;
-  border: 1px solid;
+  top: 48px;
+  left: 300px;
+  width: 400px;
+  border-radius: 5px;
+  background: #76b52d; /* Old browsers */
+  background: -moz-linear-gradient(top,  #76b52d 0%, #c3dc90 100%); /* FF3.6-15 */
+  background: -webkit-linear-gradient(top,  #76b52d 0%,#c3dc90 100%); /* Chrome10-25,Safari5.1-6 */
+  background: linear-gradient(to bottom,  #76b52d 0%,#c3dc90 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#76b52d', endColorstr='#c3dc90',GradientType=0 ); /* IE6-9 */
+  box-shadow: 1px 1px 10px 4px #999998;
+  z-index: 5;
+  font-family: 'Questrial', sans-serif;
+  text-align:center;
+}
+.searchBar h1{
+  margin:7px;
+  font-size: 26px;
+  text-align: center;
+  color: whitesmoke;
 }
 
-.ruleBox input{
-  display: block;
+/*.searchBar input{
+  padding:15px;
+  font-size:23px;
+}*/
+
+.searchBar p {
+  margin: 5px;
+}
+
+
+/* Google searchBar styling below*/
+.controls {
+  margin-top: 10px;
+  border: 1px solid transparent;
+  border-radius: 2px 0 0 2px;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  height: 32px;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+#pac-input {
+  top: 48px;
+  background-color: #fff;
+  font-family: Roboto;
+  font-size: 15px;
+  font-weight: 300;
+  margin: 5px;
+  padding: 0 11px 0 13px;
+  text-overflow: ellipsis;
+  width: 95%;
+}
+
+#pac-input:focus {
+  border-color: #4d90fe;
+}
+
+.pac-container {
+  font-family: Roboto;
+}
+
+#type-selector {
+  color: #fff;
+  background-color: #4d90fe;
+  padding: 5px 11px 0px 11px;
+}
+
+#type-selector label {
+  font-family: Roboto;
+  font-size: 13px;
+  font-weight: 300;
+}
+
+.mapLoading {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  width:100%;
+  /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#ffffff+0,ffffff+100&1+0,0+100 */
+  background: -moz-linear-gradient(left,  rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%); /* FF3.6-15 */
+  background: -webkit-linear-gradient(left,  rgba(255,255,255,1) 0%,rgba(255,255,255,0) 100%); /* Chrome10-25,Safari5.1-6 */
+  background: linear-gradient(to right,  rgba(255,255,255,1) 0%,rgba(255,255,255,0) 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#00ffffff',GradientType=1 ); /* IE6-9 */
+}
+
+/* Fade-In Effect */
+.visible {
+visibility: visible;
+opacity: 1;
+transition: opacity 0.5s linear;
+}
+/* Fade-Out Effect */
+.hidden {
+visibility: hidden;
+opacity: 0;
+transition: visibility 1s, opacity 1s linear;
+}
+
+.mapLoading img{
+  height: 60px;
+}
+
+.mapLoading span{
+  font-size: 24px;
+  position: relative;
+  top: -20px;
+  color:#79B630;
+}
+
+.delete-rule{
+  color: #f00;
+  cursor: pointer;
+  text-align: center;
+  background-color: #FFC7C7;
+  padding: 1px;
+  width: 60%;
+}
+
+.delete-polygon{
+  color: #f00;
+  cursor: pointer;
+  text-align: center;
+  background-color: #FFC7C7;
+  padding: 1px;
+}
+
+@keyframes customFlash {
+   0%, 50%, 100% {
+      opacity: 1;
+   }
+   25%, 75% {
+      opacity: 0;
+   }
+}
+
+.warning {
+  color:red;
+  animation-name: customFlash;
+  animation-duration: 0.5s;
 }

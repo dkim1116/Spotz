@@ -34,8 +34,6 @@ var Zones = bookShelf.Model.extend({
   },
 });
 
-
-
 db.saveRule = function (zoneId, ruleAttrs) {
   var ruleObj = {
     table: Rules,
@@ -46,8 +44,21 @@ db.saveRule = function (zoneId, ruleAttrs) {
       table: Zones,
       attrs: zoneAttrs.attributes,
     };
-    console.log('attaching rule to', zoneAttrs.attributes);
+    console.log('attaching rule ', ruleAttrs.permitCode, 'to zone', zoneAttrs.attributes.id);
     return helper.saveAndJoin(zoneObj, ruleObj, 'zones', true);
+  });
+};
+
+db.unlinkRulefromZone = function (zoneId, ruleId) {
+
+  console.log('detaching zone:', zoneId, 'from rule:', ruleId);
+
+  return new Zones({ id:zoneId }).fetch({ withRelated:['rules'] })
+  .then(function (item) {
+    return item.related('rules').detach(ruleId).then(function (data) {
+      return data;
+    });
+
   });
 };
 
@@ -89,6 +100,7 @@ db.savePermitZones = function (zoneArray) {
 
   //create tuples
   //go through each permit zone object
+  console.log(zoneArray);
   zoneArray.forEach(function (zone) {
 
     //iterate over the shapes (array of the (x,y) coordiantes/points that make up that pologyon/shape)
@@ -134,8 +146,50 @@ db.savePermitZones = function (zoneArray) {
   return helper.saveAndJoinTuples(tuplesArray, 'worldGrid');
 };
 
+db.destroyParkingZone = function (zoneId) {
+  console.log('attempting to destroy id', zoneId);
+  // return new Zones({ id:zoneId }).related('worldGrid').destroy().then(function (model) {
+  //   console.log('destoyed?', model);
+  //   return model;
+  // })
+
+  return new Zones({ id:zoneId }).fetch({ withRelated:['worldGrid'] })
+  .then(function (item) {
+    console.log('fetch succeeded');
+
+    return item.related('worldGrid').detach().then(function () {
+      console.log('world grid detached');
+
+      return item.related('rules').detach().then(function () {
+        console.log('rules detached');
+
+        return item.destroy().then(function () {
+          console.log('polygon destroyed!');
+        })
+        .catch(function (error) {
+          console.log('zone destory failed', error);
+          return error;
+        });
+      })
+      .catch(function (error) {
+        console.log('rule detach failed', error);
+        return error;
+      });
+    })
+    .catch(function (error) {
+      console.log('worldGrid detach failed', error);
+      return error;
+    });
+  })
+  .catch(function (error) {
+    console.log('fetch failed', error);
+    return error;
+  });
+
+};
+
 // read all of the permitzone data from the file and save the data to the permitzone schema/table
-exports.importParkingZone = function (path, callback) {
+db.importParkingZone = function (path, callback) {
   console.log('loading data from', path, '...');
   fs.readFile(__dirname + path, 'utf8', function (err, data) {
     if (err) {throw err; }

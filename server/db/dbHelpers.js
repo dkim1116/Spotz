@@ -2,7 +2,7 @@
 
 // The google world map measures:
 // 1. East to West with 360 degrees and 40,000Km
-// 2. North to South with 180 degrees and 12,400km
+// 2. North to South with 180 degrees and 20,000km
 
 // Our world grid will be in squares of 2km, thus
 // we are using the following formulas to translate the google coordinates into our grid location
@@ -11,7 +11,7 @@
 // (180 deg / 20,000km) * 2km = 0.018 degrees (North/South)
 
 // Thus every 0.018 degrees in the east/west direction and
-// every 0.029 degrees in north/south direction will represent one grid square of our world grid
+// every 0.018 degrees in north/south direction will represent one grid square of our world grid
 var stepX = 0.018;
 var stepY = 0.018;
 
@@ -47,12 +47,10 @@ exports.createIfNotExists = function (obj) {
   .then(function (model) {
    if (model) {
      // already exists, return true and the existing model
-     //console.log('already have', JSON.stringify(obj.attrs), 'in', obj.table);
      return { alreadyExists:true, model:model };
    }
 
    // does not exists, so create it and save it, and return false
-   //console.log('creating new ', JSON.stringify(obj.attrs), 'in', obj.table);
    return new obj.table(obj.attrs).save().then(function (model) {
      return { alreadyExists:false, model:model };
    });
@@ -63,11 +61,6 @@ exports.createIfNotExists = function (obj) {
 //then joins them based on their ids in the join table
 exports.saveAndJoin = function (obj1, obj2, joinMethodNameForObj2, joinEvenIfBothExist) {
   joinEvenIfBothExist = joinEvenIfBothExist || false;
-
-  // joinObj  = zones.model.worldGrid()
-
-  // joinObj  = zones.model['worldGrid']()
-  // joinObj  = zones.model[joinMethodName]()
 
   /*
   obj1 = {
@@ -98,6 +91,8 @@ exports.saveAndJoin = function (obj1, obj2, joinMethodNameForObj2, joinEvenIfBot
     if ((!firstAlreadyExisted || !secondAlreadyExisted) || joinEvenIfBothExist) {  // Either one didn't already exist
       obj2Result.model[joinMethodNameForObj2]().attach(tempObj1Result); // Join them in the join table
     }
+
+    return obj2Result.model;
   });
 
 };
@@ -107,6 +102,7 @@ exports.saveAndJoin = function (obj1, obj2, joinMethodNameForObj2, joinEvenIfBot
 exports.saveAndJoinTuples = function (arrayOfStuff, joinMethodNameOfSecondElementofEachTuple) {
   //input array of tuples [[worldGridObj,permitZoneObj],[worldGridObj,permitZoneObj],[worldGridObj,permitZoneObj]]
   console.log('adding', arrayOfStuff.length, 'tuples ...');
+
   var recursiveFn = function (i) {
 
     if (i < 0) {  // base case
@@ -115,13 +111,14 @@ exports.saveAndJoinTuples = function (arrayOfStuff, joinMethodNameOfSecondElemen
 
     // Call saveAndJoin, then return a promise when done, only then can the next call be made
     return exports.saveAndJoin(arrayOfStuff[i][0], arrayOfStuff[i][1], joinMethodNameOfSecondElementofEachTuple)
-    .then(function () {
+    .then(function (model) {
 
       //seperate the entries in time to reduce database load
-      //return a promise that is resolved once the recursive funciton that is called, returns.
+      //return a promise that is resolved once the recursive funcition that is called, returns.
       return new Promise(function (resolve) {
         setTimeout(function () {
-          resolve(recursiveFn(i - 1)); //fyi, recursing with i value decreasing
+          recursiveFn(i - 1); //fyi, recursing with i value decreasing
+          resolve(model); //return the obj2 model passed from saveAndJoin
         }, 1);  //120 ms will load 2000 items in apprx 5 minutes
       });
 
@@ -152,30 +149,14 @@ exports.grabRelatedPolygons = function (worldGridObj) {
       return null;
     }
 
-    //get the related zones for that world grid coordinate annnnd attach the rules to each zone
+    // get the related zones for that world grid coordinate annnnd attach the rules to each zone
     // worldGridResult.related('zones') returns a collection of zones
     // worldGridResult.related('zones').load('rules') loads rules onto each element of the collection
     return worldGridResult.related('zones').load('rules')
     .then(function (zonesWithRules) {
       //print out the rules
-      // zonesWithRules.forEach(function (zone) {
-      //   console.log('zone id: ', zone.get('id'), 'rule model: ', zone.related('rules').at(0));
-      //
-      // });
-
       return zonesWithRules;
 
     });
-
-    // worldGridResult.related('zones').forEach(function (zone) {
-    //   zone.related('rules').fetch().then(function (rule) {
-    //     console.log('rule?>>>', rule.attributes);
-    //   });
-
-    //   console.log('rule id:', zone.related('rules').get('id'), ', color:', zone.related('rules').color);
-    // });
-
-    //  return worldGridResult.related('zones');
-
   });
 };

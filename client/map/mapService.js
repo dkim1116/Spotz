@@ -1,239 +1,458 @@
-angular.module('MapServices', ['AdminServices'])
+'use strict';
 
-.factory('MapFactory', ['$http', '$window', '$timeout', '$cookies', 'KeyFactory', function ($http, $window, $timeout, $cookies, KeyFactory) {
+angular.module('MapServices')
 
-  var factory = {};
-  var street = [];
-  var streets = [];
-  var infowindow = {};
-  var colors = {};
-  var colorOptions = [];
-  var topRightX;
-  var topRightY;
-  var bottomLeftX;
-  var bottomLeftY;
-  var token = $cookies.get('credentials');
-  factory.map = {};
+.factory('MapFactory', [
+  '$rootScope',
+  '$http',
+  '$window',
+  '$timeout',
+  '$cookies',
+  'MapHelperFactory',
+  function ($rootScope, $http, $window, $timeout, $cookies, MapHelperFactory) {
 
-  factory.loadColors = function (callback) {
-    return $http({
-      method:'GET',
-      url: '/map/colors.json',
-    })
-    .success(function (data) {
-      console.log('colors loaded!', data);
-      colors = data;
-      colorOptions = Object.keys(colors);
-      callback(data);
+    //google searchbar
+    var searchBox = {};
+    var minZoomLevel = 14;
+    var initialZoomLevel = 14;
+    var searchZoomLevel = 18;
+
+    //remember what we fetched
+    //stores for all gridzone (square boxes) that have been fetched
+    var downloadedGridZones = {};
+
+    //storeswhich gridzones are currently displayed
+    var displayedGridZones = {};
+
+    //stores which polygons are on the map
+    var displayedPolygons = {};
+
+    var gridLines = [];
+
+    //properties that are returned
+    var factory = {
+      map:{},
+      mapEvents:{},
+    };
+
+    //=====================================================
+    //broadcasted event listeners
+    $rootScope.$on('destroyMapData', function () {
+      downloadedGridZones = {};
+      displayedPolygons = {};
     });
-  };
 
-  factory.fetchParkingZones = function (coordinates) {
+    $rootScope.$on('removeFeatureFromMap', function (event, feature) {
+      factory.map.data.remove(feature);
+    });
 
-    $http({
-      method:'GET',
-      url: '/api/zones/' + coordinates[0] + '/' + coordinates[1] + '/' + coordinates[2],
-    })
-    .success(function (data) {
-      var polyColor;
+    //=====================================================
+    //private functions
 
-      console.log('got em', data);
-      data.forEach(function (poly, i) {
+    function removeFeature(feature) {
+      factory.map.data.remove(feature);
+    }
 
-        if (poly.rules.length) {
-          console.log(poly.id, 'has rule color', poly.rules[0].color);
-        }
+    function putSingleFeatureOnTheMap(geoJson) {
+      var newFeature = factory.map.data.addGeoJson(geoJson)[0];
 
-        polyColor = '0,0,0';
-        if (poly.rules[0]) {
-          polyColor = poly.rules[0].color;
-        }
+      //color it based on the currently selected constraints ($rootScope.constraints)
+      var newColor = MapHelperFactory.getColorOfRule(newFeature, $rootScope.constraints);
+      if (newColor) {
+        newFeature.setProperty('color', newColor.color);
+        newFeature.setProperty('show', newColor.show);
+      }
 
-        var p = {
-          type: 'Feature',
-          properties:{
-            rules: poly.rules,
-            index: i,
-            color: polyColor, //always colors by the first rule
-            id: poly.id,
-            parkingCode:poly.parkingCode,
-          },
-          geometry:{
-            type: 'MultiPolygon',
-            coordinates: [[JSON.parse(poly.boundary)]],
-          },
+      return newFeature;
+    }
+
+    function putArrayOnTheMap(gridStr) {
+
+      return function (geoJsonData) {
+
+        //iterate through geoJsonData and add each feature one after the other
+        //timeout will render the polygons slowly
+        var recursiveForLoop = function (i) {
+
+          return new Promise(function (resolve) {
+
+            if (i === geoJsonData.length - 1 || geoJsonData.length === 0) {
+              resolve();
+              return;
+            }
+
+            $timeout(function () {
+
+              if (displayedPolygons[geoJsonData[i].properties.id]) {
+                //this feature is already displayed
+                resolve(recursiveForLoop(i + 1));
+              }else {
+                //create the feature and display it
+                displayedPolygons[geoJsonData[i].properties.id] = true;
+                var newFeature = putSingleFeatureOnTheMap(geoJsonData[i]);
+                downloadedGridZones[gridStr].push(newFeature);
+                resolve(recursiveForLoop(i + 1));
+              }
+
+            }, 0);
+
+          });
         };
-        factory.map.data.addGeoJson(p);
 
-      });
+        return recursiveForLoop(0);
+      };
+    }
 
-      // var parkingColor = {};
-      // var zoneCounter = 0;
-      //
-      // var colorGenerator = function () {
-      //   var randomColor = colorOptions[Math.round(colorOptions.length * Math.random())];
-      //   return colors[randomColor].rgb;
-      // };
-      //
-      // var parkingCode;
+    function fetchGeoJson(coordinates) {
+      //if we made it here, we need to fetch the gridzone from the server
+      //mark coordinates as downloaded
+      var downloadedPolygons = [];
 
-      // factory.map.data.setStyle(function (feature) {
-      //   parkingCode = feature.getProperty('parkingCode');
-      //
-      //   if (!parkingColor[parkingCode]) {
-      //     parkingColor[parkingCode] = colorGenerator(parkingCode);
-      //     console.log(zoneCounter, parkingCode, parkingColor[parkingCode]);
-      //     zoneCounter++;
-      //   }
-      //
-      //   var polyColor = parkingColor[parkingCode];
-      //
-      //   return ({
-      //      strokeColor: 'rgb(' + polyColor + ')',
-      //      fillColor:'rgba(' + polyColor + ', 0.7)',
-      //      strokeWeight: 1,
-      //    });
-      // });
-      //
+      //turn on loading icon
+      $rootScope.$emit('fetchingStart');
 
-      // TO DO:
-      // Function to display parking options at current time
-      // Input is the rules object
-      // Output is string to display the options
+      return $http.get('/api/zones/' + coordinates[0] + '/' + coordinates[1])
+      .then(function (response) {
 
-      // var parkingOptionRightNow = function (rulesObj) {
-      //   var date = moment().format('MM-DD-YYYY');
-      //   var currentTime = moment().format('h:mm a');
-      // };
+        var polygonsFromDb = response.data;
 
-      factory.map.data.addListener('mouseover', function (event) {
-        var numOfRules = event.feature.getProperty('rules').length;
-        var rulesToDisplay = '';
-        for (var i = 0; i < numOfRules; i++) {
-          rulesToDisplay += 'Permit code: ' + event.feature.getProperty('rules')[i].permitCode + '<br>';
-          rulesToDisplay += 'Days: ' + event.feature.getProperty('rules')[i].days + '<br>';
-          rulesToDisplay += event.feature.getProperty('rules')[i].timeLimit + 'hrs' + '<br>';
-          rulesToDisplay += event.feature.getProperty('rules')[i].startTime + ' to ';
-          rulesToDisplay += event.feature.getProperty('rules')[i].endTime + '<br>';
+        $rootScope.$broadcast('mapLoaded');
+
+        var boundary;
+        var p;
+
+        //no data for these coordinates
+        if (!polygonsFromDb.length) {
+          return downloadedPolygons;
         }
 
-        if (numOfRules === 0) {
-          rulesToDisplay = 'Parking info not available';
-        }
+        //loop through zone data and put them on the map
+        polygonsFromDb.forEach(function (poly, i) {
 
-        infowindow.setContent(rulesToDisplay, event);
+          //make a geoJSON object to be placed on the map
+          //http://geojson.org/geojson-spec.html
+          //google maps accepts this type of data
 
-        // infowindow.setContent(event.feature.getProperty('id').toString(), event);
-        infowindow.setPosition(event.latLng);
-        infowindow.open(factory.map);
+          boundary = JSON.parse(poly.boundary);
+          if (poly.rules[0] && poly.rules[0].permitCode.indexOf('sweep') !== -1) {
+            //we have a line
+            p = {
+              type: 'Feature',
+              properties:{
+                rules: poly.rules,
+                index: i,
+                color: '0,0,0',
+                show: true,
+                id: poly.id,
+                parkingCode:poly.parkingCode,
+              },
+              geometry:{
+                type: 'LineString',
+                coordinates: boundary,
+              },
+            };
+          } else {
+            //we have a polygon
+            p = {
+              type: 'Feature',
+              properties:{
+                rules: poly.rules,
+                index: i,
+                color: '0,0,0',
+                show: true,
+                id: poly.id,
+                parkingCode:poly.parkingCode,
+              },
+              geometry:{
+                type: 'MultiPolygon',
+                coordinates: [[boundary]],
+              },
+            };
+
+          }
+
+          downloadedPolygons.push(p);
+        });
+
+        return downloadedPolygons;
+
       });
+    }
 
-    });
-  };
+    function setupMap() {
+      //=====================================================
+      //EXPECTED to have a google.maps object here!
 
-  factory.sendRule = function (id, rule) {
-    //send off the request to store the data
-    return $http({
-      method:'POST',
-      url: '/api/rule/' + id,
-      data: rule,
-    })
-    .success(function () {
-      //color the space to something
-      console.log('rule saved for', id);
-    });
-  };
-
-  factory.init = function (callback) {
-
-    console.log('setting up the map...');
-
-    //jsonp
-    $http.jsonp('https://maps.googleapis.com/maps/api/js?key=' + KeyFactory.map + '&callback=JSON_CALLBACK')
-    .success(function () {
-
-      console.log('creating map');
+      //create a new map and center to downtown Berkeley
       factory.map = new google.maps.Map(document.getElementById('map'), {
-        zoom: 14,
-        center: { lng: -122.27156639099121, lat: 37.86634903305901 },
+        zoom: initialZoomLevel,
+        center: { lng: -122.27556639099121, lat: 37.86934903305901 },
       });
 
-      factory.map.addListener('tilesloaded', function () {
-        topRightY = factory.map.getBounds().getNorthEast().lat();
-        topRightX = factory.map.getBounds().getNorthEast().lng();
-        bottomLeftY = factory.map.getBounds().getSouthWest().lat();
-        bottomLeftX = factory.map.getBounds().getSouthWest().lng();
+      //events will allow us to access and remove event listeners
+      factory.mapEvents = google.maps.event;
 
-        //display gridlines
-        var stepX = 0.018;
-        var stepY = 0.018;
+      //save the tooltip (infowindow) in a local variable
+      var tooltip = new google.maps.InfoWindow({ maxWidth: 200 });
 
-        console.log('titles loaded', [topRightX, topRightY], [bottomLeftX, bottomLeftY]);
+      // Create the search box and link it to the UI element.
+      searchBox = new google.maps.places.SearchBox(document.getElementById('pac-input'));
 
-        var curLine = Math.ceil(bottomLeftX / stepX) * stepX;
-        var f;
-        while (curLine < topRightX) {
-          //line
-          console.log('painting line', [curLine, topRightY], [curLine, bottomLeftY]);
-          f = {
-            type: 'Feature',
-            properties:{},
-            geometry:{
-              type:'LineString',
-              coordinates: [[curLine, topRightY], [curLine, bottomLeftY]],
-            },
-          };
+      var googleObj = {
+        tooltip: tooltip,
+        map: factory.map,
+        events: factory.mapEvents,
+      };
 
-          //data format line = [ [point 1], [point 2], ....]
-          factory.map.data.addGeoJson(f);
-          curLine = curLine + stepX;
+      $rootScope.$broadcast('googleAvailable', googleObj);
+
+      //=====================================================
+      //tell the map how to set the syle of every feature
+
+      //variables for factory.map.data.setStyle function
+      //(so they aren't re-declared each time)
+      var weight;
+      var color;
+      var show;
+      var strokeOpacity;
+      var fillOpacity;
+      var rules;
+
+      //how to set the color based on the rule table
+      factory.map.data.setStyle(function (feature) {
+
+        //defaults
+        weight = 1;
+        color = feature.getProperty('color') || '0,0,0';
+        show = feature.getProperty('show') && true;
+        strokeOpacity = 1.0;
+        fillOpacity = 0.7;
+        rules = feature.getProperty('rules') || [];
+
+        //give the street sweeping a thicker line
+        if (rules[0] && rules[0].permitCode.indexOf('sweep') !== -1) {
+          weight = 3;
         }
 
-        curLine = Math.ceil(bottomLeftY / stepY) * stepY;
-        while (curLine < topRightY) {
-          //line
-          console.log('painting line', [topRightX, curLine], [bottomLeftX, curLine]);
-          f = {
-            type: 'Feature',
-            properties:{},
-            geometry:{
-              type:'LineString',
-              coordinates: [[topRightX, curLine], [bottomLeftX, curLine]],
-            },
-          };
+        //hide feature
+        if (!show) {
+          strokeOpacity = 0.3;
+          fillOpacity = 0.1;
+          weight = 1;
+        }
 
-          //data format line = [ [point 1], [point 2], ....]
-          factory.map.data.addGeoJson(f);
-          curLine = curLine + stepY;
+        return ({
+           strokeColor: 'rgba(' + color + ', ' + strokeOpacity + ')',
+           fillColor:'rgba(' + color  + ', ' + fillOpacity + ')',
+           strokeWeight: weight,
+         });
+      });
+
+      //=====================================================
+      // Listener for loading in data as the map scrolls
+
+      //add listenter to debounced version of refreshDisplayedFeatures (front end optimization)
+      var debouncedRefresh = MapHelperFactory.debounce(factory.refreshDisplayedFeatures, 250);
+      factory.map.addListener('center_changed', debouncedRefresh);
+
+      //=====================================================
+      //Google search bar functionality
+
+      // Listen for the event fired when the user enters an address
+      searchBox.addListener('places_changed', function () {
+
+        var places = searchBox.getPlaces();
+        var bounds = new google.maps.LatLngBounds();
+
+        places.forEach(function (place) {
+
+          if (place.geometry.viewport) {
+            // Only geocodes have viewport.
+            bounds.union(place.geometry.viewport);
+          } else {
+            bounds.extend(place.geometry.location);
+          }
+        });
+
+        //change the map location
+        factory.map.fitBounds(bounds);
+
+        //set the zoom level
+        factory.map.setZoom(searchZoomLevel);
+
+      });
+
+      //=====================================================
+      // Limit the zoom level
+      google.maps.event.addListener(factory.map, 'zoom_changed', function () {
+
+        var currentZoomLevel = factory.map.getZoom();
+
+        if (currentZoomLevel < minZoomLevel) {
+          factory.map.setZoom(minZoomLevel);
+          $rootScope.$broadcast('maxZoomOutReached');
+        } else if (currentZoomLevel > minZoomLevel)  {
+          $rootScope.$broadcast('lessThanMaxZoomOut');
+        }
+      });
+
+      //=====================================================
+      //paint gridlines
+      factory.mapEvents.addListenerOnce(factory.map, 'tilesloaded', function () {
+
+        //load initial data onto map
+        factory.refreshDisplayedFeatures();
+      });
+
+      //finally, we are at the end of init
+      //execute the callack passed in, returning the map object
+      return Promise.resolve(factory.map);
+    }
+
+    function displayCachedMapData(gridStr) {
+      //check to see if they are displayed, if not, display them
+      var newColor;
+
+      downloadedGridZones[gridStr].forEach(function (feature) {
+
+        factory.map.data.add(feature);
+
+        //color it based on the currently selected constraints ($rootScope.constraints)
+        newColor = MapHelperFactory.getColorOfRule(feature, $rootScope.constraints);
+        if (newColor) {
+          feature.setProperty('color', newColor.color);
+          feature.setProperty('show', newColor.show);
         }
 
       });
 
-      infowindow = new google.maps.InfoWindow();
+      displayedGridZones[gridStr] = true;
 
-      factory.map.data.setStyle({
-        strokeWeight: 5,
+      //return a promise, passing array of features
+      return Promise.resolve(downloadedGridZones[gridStr]);
+    }
+
+    //===================================================
+    //exposed functions
+
+    factory.clearDisplayed = function () {
+      downloadedGridZones = {};
+      displayedGridZones = {};
+      displayedPolygons = {};
+    };
+
+    factory.filterFeatures = function (constraints) {
+      // constraints object can have permitCode text
+      // or date, time, duration information for mobile preview
+
+      if (!constraints) {
+        return;
+      }
+
+      MapHelperFactory.setAllFeatureColors(factory.map, constraints);
+
+    };
+
+    factory.fetchAndDisplayParkingZonesAt = function (coordinates) {
+
+      var gridStr = JSON.stringify(MapHelperFactory.computeGridNumbers(coordinates));
+
+      //check if we already downloaded this gridzone
+      if (downloadedGridZones[gridStr]) {
+
+        if (!displayedGridZones[gridStr]) {
+          return displayCachedMapData(gridStr);
+        }
+
+        //they are displayed, so return
+        return Promise.resolve(downloadedGridZones[gridStr]);
+      }
+
+      //if we made it here, we need to fetch the gridzone from the server
+      downloadedGridZones[gridStr] = [];
+
+      return fetchGeoJson(coordinates)
+      .then(putArrayOnTheMap(gridStr))
+      .then(function () {
+        displayedGridZones[gridStr] = true;
+        $rootScope.$emit('fetchingEnd');
+        return downloadedGridZones[gridStr];
+      });
+    };
+
+    factory.removeFeaturesNotIn = function (coordinateSet) {
+
+      var displayedZones = {};
+
+      for (var i = 0; i < coordinateSet.length; i++) {
+        var gridStr = JSON.stringify(MapHelperFactory.computeGridNumbers(coordinateSet[i]));
+        displayedZones[gridStr] = true;
+      }
+
+      //search through all download gridzones
+      for (var gridZone in downloadedGridZones) {
+
+        //hide any gridZones that are not in the current area
+        if (!displayedZones[gridZone]) {
+
+          downloadedGridZones[gridZone].forEach(removeFeature);
+
+          // set the display value to false so that the zones will be
+          // displayed next time they are fetched
+          displayedGridZones[gridZone] = false;
+        }
+      }
+    };
+
+    factory.refreshDisplayedFeatures = function () {
+
+      var top = factory.map.getBounds().getNorthEast().lat();
+      var right = factory.map.getBounds().getNorthEast().lng();
+      var bottom = factory.map.getBounds().getSouthWest().lat();
+      var left = factory.map.getBounds().getSouthWest().lng();
+
+      var tr = [right, top];
+      var br = [right, bottom];
+      var tl = [left, top];
+      var bl = [left, bottom];
+
+      var boxBoundaries = MapHelperFactory.fillInterior(tl, br, tr, bl);
+
+      boxBoundaries.forEach(function (coordinates) {
+        factory.fetchAndDisplayParkingZonesAt(coordinates);
       });
 
-      factory.map.addListener('click', function (event) {
-        var coordinates = [event.latLng.lng(), event.latLng.lat(), token];
-        console.log(coordinates);
-        factory.fetchParkingZones(coordinates);
-      });
+      //re-paint gridlines
+      gridLines.forEach(removeFeature);
+      gridLines = MapHelperFactory.paintGridLines(factory.map);
 
-      //on polygon click
-      // factory.map.data.addListener('click', function (event) {
-      //   var coordinates = [event.latLng.lng(), event.latLng.lat()];
-      //   console.log(coordinates);
-      // });
+      factory.removeFeaturesNotIn(boxBoundaries);
+    };
 
-      callback(factory.map);
+    //===================================================
+    //INIT
+    //loads the google API and sets up map initial event listeners
 
-    }).error(function (data) {
-      console.log('map load failed', data);
-    });
-  };
+    factory.init = function (googleMapsApiKey, callback) {
+      //get the google map object
+      if (!window.google) {
+        //hit the google api to get the google object on the window
+        var url = 'https://maps.googleapis.com/maps/api/js';
+        url += '?key=' + googleMapsApiKey;
+        url += '&libraries=places';
+        url += '&callback=JSON_CALLBACK';
 
-  return factory;
-},
+        $http.jsonp(url).then(setupMap).then(callback)
+        .catch(function (data) {
+          console.log('map load failed', data);
+        });
+      } else {
+        //dont hit the google api, just setup the map
+        setupMap().then(callback);
+      }
+
+    };
+
+    return factory;
+  },
 ]);

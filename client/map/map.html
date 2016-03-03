@@ -1,10 +1,17 @@
-<div id="map"></div>
-<div class="ruleBox">
-  <h2>Add your rule here!</h2>
-  <span>code</span><input type="text" ng-model="rule.permitCode">
-  <span>days</span><input type="text" ng-model="rule.days">
-  <span>timeLimit</span><input type="text" ng-model="rule.timeLimit">
-  <span>startTime</span><input type="text" ng-model="rule.startTime">
-  <span>endTime</span><input type="text" ng-model="rule.endTime">
-  <span>color</span><input type="text" ng-model="rule.color">
+<div id="map">
+</div>
+
+<div class="searchBar">
+  <h1>Search bar</h1>
+  <input id="pac-input" class="controls" type="text" placeholder="Google Maps Search">
+
+  <div class="warning" ng-if="maxZoomOut">
+	<span>Max Zoom out reached.</span>
+  </div>
+
+</div>
+
+<div class="mapLoading {{showLoading}}">
+  <img src="./assets/images/squares.gif"/>
+  <span>Fetching Parking Data . . .</span>
 </div>

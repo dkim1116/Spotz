@@ -2,7 +2,6 @@
 
 var knex = require('knex');  //knex mySql queries
 var bookShelf = require('bookshelf');  //ORM
-var parkingDB = require('./parking.js');  // models and functions for permitzone parking
 
 var connection = process.env.JAWSDB_URL || {
     host: 'localhost',
@@ -45,19 +44,21 @@ bookShelf.knex.schema.hasTable('worldGrid').then(function (exists) {
     return bookShelf.knex.schema.createTable('zones', function (zone) {
       console.log('creating NEW zones table');
       zone.increments('id').primary();
-      zone.text('boundary', 'mediumtext');  //strigified list of all coordinate points that make up a permit zone
+
+      //boundary is strigified list of all coordinate points that make up a permit zone
+      zone.text('boundary', 'mediumtext');
     });
   });
 })
 
 // Create the zones/worldgrid join table
 .then(function () {
-  return bookShelf.knex.schema.hasTable('worldgrid_zones').then(function (exists) {
+  return bookShelf.knex.schema.hasTable('worldGrid_zones').then(function (exists) {
     if (exists) {
       return console.log('worldgrid_zones table already exists');
     }
 
-    return bookShelf.knex.schema.createTable('worldgrid_zones', function (table) {
+    return bookShelf.knex.schema.createTable('worldGrid_zones', function (table) {
       console.log('creating NEW join table zones_worldGrid');
       table.integer('worldGrid_id').unsigned().references('worldGrid.id');
       table.integer('zone_id').unsigned().references('zones.id');
@@ -99,16 +100,6 @@ bookShelf.knex.schema.hasTable('worldGrid').then(function (exists) {
   });
 });
 
-//DATA NOW LOADED FROM spotz.sql
-// ***
-// Import Permit Zone info (using the function defined in parking.js)
-// ***
-// .then(function () {
-//   // return parkingDB.importParkingZone('/zoneData/berkeley.json', function () {
-//   //   console.log('data loaded!!');
-//   // });
-// });
-
 // Create the user schema/table
 bookShelf.knex.schema.hasTable('users').then(function (exists) {
   if (!exists) {
@@ -118,34 +109,20 @@ bookShelf.knex.schema.hasTable('users').then(function (exists) {
      user.string('password');
      user.string('googleId').unique();
      user.string('facebookId').unique();
+     user.boolean('admin').defaultTo(false);
    }).then(function (table) {
      console.log('Created Table', table);
    });
   }
 });
 
-// NOTE: we will have to change this most likely
-//  streetSegment.number('segmentStartXCoordinate', 255);
-//  streetSegment.number('segmentStartYCoordinates', 255);
-//  streetSegment.number('segmentEndXCoordinates', 255);
-//  streetSegment.number('segmentEndYCoordinates', 255);
-
-// Create the streetSweeping schema/table
-bookShelf.knex.schema.hasTable('streetSweeping').then(function (exists) {
+bookShelf.knex.schema.hasTable('contribution').then(function (exists) {
   if (!exists) {
-    bookShelf.knex.schema.createTable('streetSweeping', function (table) {
-      //  table.increments('id').primary();
-      table.integer('Rte');
-      table.string('Street Name');
-      table.integer('Address From');
-      table.integer('Address To');
-      table.string('Day of Month');
-      table.string('AM/PM');
-      table.string('Side');
-      table.string('From');
-      table.string('To');
-      table.integer('Opt-out');
-    }).then(function (table) {
+    return bookShelf.knex.schema.createTable('contribution', function (post) {
+     post.increments('id').primary();
+     post.string('post');
+     post.text('coordinates', 'mediumtext');
+   }).then(function (table) {
      console.log('Created Table', table);
    });
   }
