@@ -144,12 +144,26 @@ angular.module('spotz.side', ['MapServices'])
 
     };
 
+    $scope.toggleAddFeatureMenu = function () {
+      //toggle drop down
+      $scope.ShowAddFeatureMenu = !$scope.ShowAddFeatureMenu;
+
+      //disable the drawing factory mode
+      if ($scope.ShowAddFeatureMenu) {
+        $scope.showOnly('addNewFeature');
+      } else {
+        //disable the drawing factory mode
+        DrawingFactory.addPolygonOnClick(false);
+        $scope.style.addNewFeature = '';
+        $scope.ShowAddFeatureMenu = false;
+      }
+    };
+
     //save a newly drawn polygon
     $scope.savePolygon = function () {
       DrawingFactory.savePolygon().then(function (result) {
         if (result) {
           //turn off drawing mode
-          console.log('turning off drawing mode');
           $scope.ShowAddFeatureMenu = false;
           DrawingFactory.addPolygonOnClick(false);
           $scope.style.addNewFeature = '';
@@ -189,7 +203,7 @@ angular.module('spotz.side', ['MapServices'])
 
         SelectedFeatureFactory.sendRule($scope.rule)
         .then(function (response) {
-          console.log('here is the rule', response.data);
+
           var newRule = {
             id: response.data.id,
             permitCode:response.data.permitCode,
@@ -209,9 +223,6 @@ angular.module('spotz.side', ['MapServices'])
 
           TooltipFactory.create(feature);
 
-        })
-        .catch(function (err) {
-          console.log('saved failed', err);
         });
       }
     };
